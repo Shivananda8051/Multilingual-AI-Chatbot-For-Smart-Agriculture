@@ -1,0 +1,317 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply font-sans antialiased bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 m-0;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+  }
+
+  .btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 6px 14px rgba(76, 175, 80, 0.25);
+  }
+
+  .btn-secondary {
+    @apply bg-secondary-500 text-white hover:bg-secondary-600 active:bg-secondary-700;
+  }
+
+  .btn-accent {
+    @apply bg-accent-500 text-white hover:bg-accent-600 active:bg-accent-700;
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20;
+  }
+
+  .btn-ghost {
+    @apply text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800;
+  }
+
+  .btn-danger {
+    @apply bg-red-500 text-white hover:bg-red-600 active:bg-red-700;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all dark:bg-gray-800 dark:border-gray-600 dark:focus:border-primary-400;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900
+           focus:border-primary-500 focus:ring-2 focus:ring-primary-200 outline-none transition-all
+           dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400
+           dark:focus:border-primary-400 dark:focus:ring-primary-800;
+  }
+
+  .input-field option {
+    @apply bg-white text-gray-900 dark:bg-gray-700 dark:text-white;
+  }
+
+  select.input-field {
+    @apply appearance-none cursor-pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+
+  .dark select.input-field {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border border-gray-100 dark:bg-gray-800 dark:border-gray-700;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  .card-hover {
+    @apply hover:border-primary-200 transition-all cursor-pointer dark:hover:border-primary-600;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  .card-hover:hover {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300;
+  }
+
+  .badge-accent {
+    @apply bg-accent-100 text-accent-800 dark:bg-accent-900/30 dark:text-accent-300;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300;
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, #2d5a3d 0%, #1e4d2b 50%, #2d5a3d 100%);
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-500;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-primary-600 transition-all dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-primary-400 border-l-4 border-transparent;
+  }
+
+  .nav-link-active {
+    @apply bg-primary-50 text-primary-700 font-semibold border-l-4 border-primary-600 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-400;
+  }
+
+  .nav-link-active svg {
+    @apply text-primary-600 dark:text-primary-400;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  .animate-bounce-in {
+    animation: bounceIn 0.5s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.voice-pulse {
+  animation: voicePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes voicePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: skeleton 1.5s ease-in-out infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Message bubbles */
+.message-user {
+  @apply bg-primary-600 text-white rounded-2xl rounded-tr-sm;
+}
+
+.message-assistant {
+  @apply bg-gray-100 text-gray-800 rounded-2xl rounded-tl-sm dark:bg-gray-700 dark:text-gray-100;
+}
+
+/* Custom prose styles for chat messages */
+.message-assistant .prose {
+  @apply text-gray-800 dark:text-gray-100;
+}
+
+.message-assistant .prose strong {
+  @apply text-gray-900 dark:text-white font-semibold;
+}
+
+.message-assistant .prose ul {
+  @apply list-disc list-inside space-y-1 pl-0;
+}
+
+.message-assistant .prose ol {
+  @apply list-decimal list-inside space-y-1 pl-0;
+}
+
+.message-assistant .prose li {
+  @apply text-gray-700 dark:text-gray-200;
+}
+
+.message-assistant .prose p {
+  @apply text-gray-800 dark:text-gray-100 leading-relaxed;
+}
+
+.message-assistant .prose a {
+  @apply text-primary-600 dark:text-primary-400 underline;
+}
+
+.message-assistant .prose code {
+  @apply bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-sm;
+}
+
+.message-assistant .prose h1,
+.message-assistant .prose h2,
+.message-assistant .prose h3 {
+  @apply font-semibold text-gray-900 dark:text-white;
+}
+
+/* Image grid for posts */
+.image-grid-1 {
+  @apply grid-cols-1;
+}
+
+.image-grid-2 {
+  @apply grid-cols-2;
+}
+
+.image-grid-3 {
+  @apply grid-cols-2;
+}
+
+.image-grid-4 {
+  @apply grid-cols-2;
+}
