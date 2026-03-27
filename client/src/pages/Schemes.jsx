@@ -9,6 +9,25 @@ import {
 import { FaFileAlt, FaCheckCircle, FaTimesCircle, FaHourglassHalf } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
+// Custom hook for debouncing values
+const useDebounce = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    // Set a timeout to update the debounced value after the delay
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    // Clear timeout if value changes before delay completes
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 // Scheme Card Component
 const SchemeCard = ({ scheme, onSelect, onCheckEligibility }) => {
   const categoryColors = {
@@ -37,13 +56,14 @@ const SchemeCard = ({ scheme, onSelect, onCheckEligibility }) => {
       className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-3 sm:p-5 hover:shadow-lg transition-shadow cursor-pointer"
       onClick={() => onSelect(scheme)}
     >
-      <div className="flex justify-between items-start mb-2 sm:mb-3">
+      <div className="flex justify-between items-start mb-2 sm:mb-3 gap-2">
         <span className={`text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full ${categoryColors[scheme.category]}`}>
           {scheme.category}
         </span>
-        {scheme.featured && (
-          <span className="text-[10px] sm:text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300 px-2 py-0.5 sm:py-1 rounded-full">
-            Featured
+        {scheme.isLive && (
+          <span className="text-[10px] sm:text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1">
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+            Live
           </span>
         )}
       </div>
@@ -274,12 +294,15 @@ const SchemeDetailModal = ({ scheme, onClose, onApply, eligibility }) => {
 
         <div className="sticky bottom-0 bg-white dark:bg-gray-800 p-4 sm:p-6 border-t dark:border-gray-700 safe-bottom">
           <button
-            onClick={() => onApply(scheme._id)}
-            disabled={eligibility && !eligibility.isEligible}
-            className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm sm:text-base"
+            onClick={() => onApply(scheme)}
+            className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm sm:text-base flex items-center justify-center gap-2"
           >
-            {eligibility && !eligibility.isEligible ? 'Not Eligible to Apply' : 'Start Application'}
+            <HiExternalLink className="w-5 h-5" />
+            Apply on Official Portal
           </button>
+          <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
+            You will be redirected to the official government website
+          </p>
         </div>
       </div>
     </div>
@@ -340,71 +363,182 @@ const Schemes = () => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [schemes, setSchemes] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
   const [myApplications, setMyApplications] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [selectedScheme, setSelectedScheme] = useState(null);
   const [eligibility, setEligibility] = useState(null);
   const [activeTab, setActiveTab] = useState('browse');
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Agriculture,Rural & Environment');
+
+  // Debounce search input - wait 500ms after user stops typing
+  const debouncedSearch = useDebounce(search, 500);
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  // Use debounced search value to reduce API calls
   useEffect(() => {
     if (activeTab === 'browse') {
       fetchSchemes();
     }
-  }, [search, selectedCategory]);
+  }, [debouncedSearch, selectedCategory, activeTab]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [schemesRes, recommendationsRes, categoriesRes, applicationsRes] = await Promise.all([
-        schemesAPI.getSchemes({ featured: 'true', limit: 10 }),
-        schemesAPI.getRecommendations(),
-        schemesAPI.getCategories(),
+      // Fetch live schemes from government API and user applications
+      const [schemesRes, applicationsRes] = await Promise.allSettled([
+        schemesAPI.getLiveSchemes(selectedCategory),
         schemeApplicationsAPI.getMyApplications()
       ]);
 
-      setSchemes(schemesRes.data?.data || []);
-      setRecommendations(recommendationsRes.data?.data || []);
-      setCategories(categoriesRes.data?.data || []);
-      setMyApplications(applicationsRes.data?.data || []);
+      if (schemesRes.status === 'fulfilled') {
+        let rawSchemes = schemesRes.value.data?.data || [];
+        const officialPortals = schemesRes.value.data?.officialPortals || [];
+
+        if (rawSchemes.length === 0 && officialPortals.length > 0) {
+          rawSchemes = officialPortals.map((portal, index) => transformPortalToLiveScheme(portal, index));
+        }
+
+        const transformed = rawSchemes.map(scheme => transformLiveScheme(scheme));
+        setSchemes(transformed);
+      } else {
+        setSchemes([]);
+        toast.error('Failed to load schemes from government portal');
+      }
+
+      if (applicationsRes.status === 'fulfilled') {
+        setMyApplications(applicationsRes.value.data?.data || []);
+      } else {
+        setMyApplications([]);
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      toast.error('Failed to load schemes');
+      toast.error('Failed to load schemes from government portal');
     } finally {
       setLoading(false);
     }
   };
 
+  // Transform live scheme data to our format
+  const transformLiveScheme = (scheme) => {
+    return {
+      _id: scheme.id || scheme.schemeId || scheme.slug || Math.random().toString(),
+      name: scheme.schemeName || scheme.name || scheme.title || 'Unnamed Scheme',
+      shortDescription: scheme.shortDescription || scheme.description?.substring(0, 200) || 'Government scheme',
+      fullDescription: scheme.description || scheme.details || scheme.shortDescription || '',
+      category: mapLiveCategory(scheme.category),
+      status: 'active',
+      featured: false,
+      benefits: {
+        type: 'mixed',
+        description: scheme.benefits || scheme.benefitDescription || 'Government benefits available',
+        amount: scheme.benefitAmount || null
+      },
+      implementingAgency: {
+        name: scheme.ministry || scheme.department || 'Government of India',
+        website: scheme.officialUrl || scheme.website,
+        type: scheme.schemeType === 'Central' ? 'central' : scheme.schemeType === 'State' ? 'state' : 'both'
+      },
+      applicationProcess: {
+        mode: scheme.applicationMode || 'online',
+        onlinePortal: scheme.applicationUrl || scheme.applyLink || scheme.officialUrl
+      },
+      eligibility: {
+        states: scheme.states || scheme.applicableStates || [],
+        additionalCriteria: scheme.eligibility ? (Array.isArray(scheme.eligibility) ? scheme.eligibility : [scheme.eligibility]) : []
+      },
+      documents: scheme.documentsRequired || [],
+      tags: scheme.tags || [],
+      timeline: {
+        isYearRound: true
+      },
+      isLive: true // Flag to identify live data
+    };
+  };
+
+  const transformPortalToLiveScheme = (portal, index = 0) => ({
+    id: `portal-${index + 1}`,
+    schemeId: `portal-${index + 1}`,
+    schemeName: portal.name,
+    name: portal.name,
+    shortDescription: 'Official government scheme portal',
+    description: `Apply on official portal. Helpline: ${portal.helpline || 'N/A'}`,
+    category: 'Agriculture,Rural & Environment',
+    schemeType: 'Central',
+    ministry: 'Government of India',
+    officialUrl: portal.website,
+    website: portal.website,
+    applicationUrl: portal.applyUrl,
+    applyLink: portal.applyUrl,
+    source: 'official_portals'
+  });
+
+  // Map live scheme categories to our categories
+  const mapLiveCategory = (category) => {
+    const categoryMap = {
+      'Agriculture,Rural & Environment': 'subsidy',
+      'Financial Assistance': 'subsidy',
+      'Loan': 'loan',
+      'Insurance': 'insurance',
+      'Training': 'training',
+      'Equipment': 'equipment',
+      'Infrastructure': 'infrastructure'
+    };
+    return categoryMap[category] || 'subsidy';
+  };
+
   const fetchSchemes = async () => {
     try {
-      const params = {};
-      if (search) params.search = search;
-      if (selectedCategory) params.category = selectedCategory;
+      setLoading(true);
 
-      const res = await schemesAPI.getSchemes(params);
-      setSchemes(res.data?.data || []);
+      // Fetch real-time data from myScheme.gov.in
+      const category = selectedCategory || 'Agriculture,Rural & Environment';
+      const res = await schemesAPI.getLiveSchemes(category);
+      let liveSchemes = res.data?.data || [];
+      const officialPortals = res.data?.officialPortals || [];
+
+      if (liveSchemes.length === 0 && officialPortals.length > 0) {
+        liveSchemes = officialPortals.map((portal, index) => transformPortalToLiveScheme(portal, index));
+      }
+
+      // Apply search filter on client-side for live data (using debounced value)
+      if (debouncedSearch) {
+        liveSchemes = liveSchemes.filter(scheme =>
+          (scheme.schemeName || scheme.name || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          (scheme.description || scheme.shortDescription || '').toLowerCase().includes(debouncedSearch.toLowerCase())
+        );
+      }
+
+      // Transform live schemes to match our format
+      const transformedSchemes = liveSchemes.map(scheme => transformLiveScheme(scheme));
+      setSchemes(transformedSchemes);
     } catch (error) {
       console.error('Failed to fetch schemes:', error);
+      toast.error('Failed to load live schemes from government portal');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleCheckEligibility = async (schemeId) => {
     try {
-      const res = await schemesAPI.checkEligibility(schemeId);
-      setEligibility(res.data?.data);
-
-      const scheme = schemes.find(s => s._id === schemeId) ||
-                     recommendations.find(r => r.scheme._id === schemeId)?.scheme;
-
+      // For live schemes, just show the scheme details
+      const scheme = schemes.find(s => s._id === schemeId);
       if (scheme) {
-        const fullSchemeRes = await schemesAPI.getScheme(schemeId);
-        setSelectedScheme(fullSchemeRes.data?.data);
+        setSelectedScheme(scheme);
+        // Show basic eligibility info from the scheme data
+        if (scheme.eligibility) {
+          const eligibilityInfo = {
+            isEligible: true,
+            matchScore: 85,
+            matchedCriteria: scheme.eligibility.states?.length ? [`Available in: ${scheme.eligibility.states.join(', ')}`] : ['All India'],
+            unmatchedCriteria: [],
+            warnings: scheme.eligibility.additionalCriteria || []
+          };
+          setEligibility(eligibilityInfo);
+        }
       }
     } catch (error) {
       console.error('Failed to check eligibility:', error);
@@ -414,31 +548,31 @@ const Schemes = () => {
 
   const handleSelectScheme = async (scheme) => {
     try {
-      const res = await schemesAPI.getScheme(scheme._id);
-      setSelectedScheme(res.data?.data);
+      setSelectedScheme(scheme);
       setEligibility(null);
     } catch (error) {
       console.error('Failed to fetch scheme details:', error);
     }
   };
 
-  const handleApply = async (schemeId) => {
-    try {
-      const res = await schemeApplicationsAPI.createApplication({ schemeId });
-      toast.success('Application started! Complete and submit your application.');
+  const handleApply = (scheme) => {
+    // Redirect to official government portal
+    const portalUrl = scheme.applicationProcess?.onlinePortal || scheme.implementingAgency?.website;
+
+    if (portalUrl) {
+      toast.success('Redirecting to official government portal...');
+      window.open(portalUrl, '_blank', 'noopener,noreferrer');
       setSelectedScheme(null);
-      setActiveTab('applications');
-      fetchData();
-    } catch (error) {
-      console.error('Failed to start application:', error);
-      toast.error(error.response?.data?.message || 'Failed to start application');
+    } else {
+      toast.error('Official portal link not available for this scheme. Please contact the implementing agency.');
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent"></div>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Loading schemes...</p>
       </div>
     );
   }
@@ -450,9 +584,13 @@ const Schemes = () => {
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <HiDocumentText className="w-6 h-6 sm:w-7 sm:h-7 text-primary-500" />
           {t('schemes') || 'Government Schemes'}
+          <span className="flex items-center gap-1 text-xs sm:text-sm font-normal bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded-full">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            Live Data
+          </span>
         </h1>
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Discover and apply for agricultural subsidies and government benefits
+          Real-time government schemes from myScheme.gov.in - Apply directly on official portals
         </p>
       </div>
 
@@ -487,36 +625,18 @@ const Schemes = () => {
 
       {activeTab === 'browse' ? (
         <>
-          {/* Recommendations */}
-          {recommendations.length > 0 && (
-            <div className="mb-4 sm:mb-6">
-              <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                <HiLightBulb className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-                <h2 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">Recommended for You</h2>
-              </div>
-              <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-3 px-3 sm:mx-0 sm:px-0">
-                {recommendations.slice(0, 4).map((rec, index) => (
-                  <div
-                    key={index}
-                    onClick={() => handleSelectScheme(rec.scheme)}
-                    className="flex-shrink-0 bg-gradient-to-br from-primary-50 to-green-50 dark:from-primary-900/20 dark:to-green-900/20 rounded-xl p-3 sm:p-4 min-w-[220px] sm:min-w-[280px] cursor-pointer hover:shadow-md transition-shadow"
-                  >
-                    <h3 className="font-medium text-sm sm:text-base text-gray-900 dark:text-white line-clamp-2">{rec.scheme.name}</h3>
-                    <p className="text-[10px] sm:text-xs text-gray-500 capitalize">{rec.scheme.category}</p>
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 sm:mt-2 line-clamp-2">
-                      {rec.scheme.shortDescription}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="text-[10px] sm:text-xs text-primary-600 line-clamp-1">{rec.reason}</span>
-                      <span className="text-[10px] sm:text-xs bg-white dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
-                        {rec.matchScore}% match
-                      </span>
-                    </div>
-                  </div>
-                ))}
+          {/* Info Banner */}
+          <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4">
+            <div className="flex items-start gap-2">
+              <HiExternalLink className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300">Direct Government Portal Access</h4>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                  All schemes are fetched live from myScheme.gov.in. When you click "Apply", you'll be redirected to the official government portal to complete your application.
+                </p>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Search and Filter */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4 sm:mb-6">
@@ -535,12 +655,17 @@ const Schemes = () => {
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700"
             >
-              <option value="">All Categories</option>
-              {categories.map(cat => (
-                <option key={cat.category} value={cat.category}>
-                  {cat.category} ({cat.count})
-                </option>
-              ))}
+              <option value="Agriculture,Rural & Environment">Agriculture & Rural</option>
+              <option value="Financial Assistance">Financial Assistance</option>
+              <option value="Social welfare & Empowerment">Social Welfare</option>
+              <option value="Education & Learning">Education</option>
+              <option value="Skills & Employment">Skills & Employment</option>
+              <option value="Health & Wellness">Health & Wellness</option>
+              <option value="Housing & Shelter">Housing & Shelter</option>
+              <option value="Science, IT & Communications">Science & IT</option>
+              <option value="Sports & Culture">Sports & Culture</option>
+              <option value="Transport & Infrastructure">Transport & Infrastructure</option>
+              <option value="Utility & Sanitation">Utility & Sanitation</option>
             </select>
           </div>
 

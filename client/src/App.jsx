@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext';
 // Layout Components
 import Layout from './components/common/Layout';
 import AdminLayout from './components/admin/AdminLayout';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Pages
 import Landing from './pages/Landing';
@@ -129,21 +130,21 @@ function App() {
         }
       >
         <Route index element={<Home />} />
-        <Route path="chat" element={<Chat />} />
-        <Route path="disease" element={<Disease />} />
+        <Route path="chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
+        <Route path="disease" element={<ErrorBoundary><Disease /></ErrorBoundary>} />
         <Route path="blog" element={<Blog />} />
         <Route path="profile" element={<Profile />} />
         <Route path="profile/:userId" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="iot" element={<IoT />} />
+        <Route path="iot" element={<ErrorBoundary><IoT /></ErrorBoundary>} />
         <Route path="shorts" element={<Shorts />} />
         <Route path="marketplace" element={<Marketplace />} />
         <Route path="crop-calendar" element={<CropCalendar />} />
-        <Route path="schemes" element={<Schemes />} />
+        <Route path="schemes" element={<ErrorBoundary><Schemes /></ErrorBoundary>} />
         <Route path="mandi-prices" element={<MandiPrices />} />
-        <Route path="crop-recommendation" element={<CropRecommendation />} />
+        <Route path="crop-recommendation" element={<ErrorBoundary><CropRecommendation /></ErrorBoundary>} />
         <Route path="notifications" element={<NotificationSettings />} />
-        <Route path="irrigation-fertilizer" element={<IrrigationFertilizer />} />
+        <Route path="irrigation-fertilizer" element={<ErrorBoundary><IrrigationFertilizer /></ErrorBoundary>} />
       </Route>
 
       {/* Admin Routes */}

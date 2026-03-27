@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 import {
   HiArrowRight,
   HiChevronLeft,
@@ -14,6 +15,8 @@ import {
 } from 'react-icons/hi';
 
 const Landing = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, user, loading } = useAuth();
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
   const [progressWidth, setProgressWidth] = useState(0);
   const progressRef = useRef(null);
@@ -116,6 +119,25 @@ const Landing = () => {
     setProgressWidth(0);
   };
 
+  // Handle Get Started button - check auth and redirect appropriately
+  const handleGetStarted = (e) => {
+    e.preventDefault();
+
+    if (loading) return; // Wait for auth check
+
+    if (isAuthenticated) {
+      // User is already logged in
+      if (!user?.isProfileComplete) {
+        navigate('/setup-profile');
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      // User not logged in, go to login
+      navigate('/login');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'Poppins', sans-serif" }}>
       {/* Header */}
@@ -133,13 +155,14 @@ const Landing = () => {
               <a href="#testimonials" className="text-gray-600 hover:text-[#1ca069] transition-colors">Stories</a>
               <a href="#partners" className="text-gray-600 hover:text-[#1ca069] transition-colors">Partners</a>
             </nav>
-            <Link
-              to="/login"
-              className="px-5 py-2.5 bg-[#1ca069] text-white rounded-full font-medium hover:bg-[#169456] transition-colors flex items-center gap-2"
+            <button
+              onClick={handleGetStarted}
+              disabled={loading}
+              className="px-5 py-2.5 bg-[#1ca069] text-white rounded-full font-medium hover:bg-[#169456] transition-colors flex items-center gap-2 disabled:opacity-50"
             >
-              Get Started
+              {loading ? 'Loading...' : isAuthenticated ? 'Go to Dashboard' : 'Get Started'}
               <HiArrowRight className="w-4 h-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </header>
@@ -180,13 +203,14 @@ const Landing = () => {
             transition={{ delay: 0.2 }}
             className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link
-              to="/login"
-              className="cta-glow text-[#1ca069] text-lg hover:text-white bg-white hover:bg-[#1ca069] rounded-full px-6 py-3 font-semibold transition-all duration-300 flex items-center gap-2"
+            <button
+              onClick={handleGetStarted}
+              disabled={loading}
+              className="cta-glow text-[#1ca069] text-lg hover:text-white bg-white hover:bg-[#1ca069] rounded-full px-6 py-3 font-semibold transition-all duration-300 flex items-center gap-2 disabled:opacity-50"
             >
-              Start Using AgriBot
+              {loading ? 'Loading...' : isAuthenticated ? 'Go to Dashboard' : 'Start Using AgriBot'}
               <HiArrowRight className="w-5 h-5" />
-            </Link>
+            </button>
           </motion.div>
 
           {/* Phone Mockup */}
@@ -283,13 +307,14 @@ const Landing = () => {
                 Whether you need help with crop diseases, weather forecasts, market prices, or farming best practices,
                 AgriBot is here to help you 24/7 in your local language.
               </p>
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 bg-white text-[#299261] font-semibold px-6 py-3 rounded-full hover:bg-gray-100 transition-colors w-fit"
+              <button
+                onClick={handleGetStarted}
+                disabled={loading}
+                className="inline-flex items-center gap-2 bg-white text-[#299261] font-semibold px-6 py-3 rounded-full hover:bg-gray-100 transition-colors w-fit disabled:opacity-50"
               >
-                Get Started
+                {loading ? 'Loading...' : isAuthenticated ? 'Go to Dashboard' : 'Get Started'}
                 <HiArrowRight className="w-5 h-5" />
-              </Link>
+              </button>
             </div>
 
             {/* Video/Image Block */}
@@ -534,13 +559,14 @@ const Landing = () => {
             <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
               Join thousands of farmers who are already using AgriBot to grow healthier crops and increase their yields.
             </p>
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 px-8 sm:px-10 py-4 bg-white text-[#1ca069] rounded-full font-semibold text-lg hover:bg-gray-100 transition-colors shadow-lg"
+            <button
+              onClick={handleGetStarted}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-8 sm:px-10 py-4 bg-white text-[#1ca069] rounded-full font-semibold text-lg hover:bg-gray-100 transition-colors shadow-lg disabled:opacity-50"
             >
-              Get Started for Free
+              {loading ? 'Loading...' : isAuthenticated ? 'Go to Dashboard' : 'Get Started for Free'}
               <HiArrowRight className="w-5 h-5" />
-            </Link>
+            </button>
           </motion.div>
         </div>
       </section>

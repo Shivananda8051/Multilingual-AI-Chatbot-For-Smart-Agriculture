@@ -200,57 +200,84 @@ async function fetchFromApiSetu() {
  * This is the official government scheme aggregator portal
  */
 async function fetchFromMyScheme(category = 'Agriculture,Rural & Environment') {
+  const normalizeResult = (payload) => {
+    if (!payload) return [];
+
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.schemes)) return payload.schemes;
+    if (payload.hits && Array.isArray(payload.hits.items)) return payload.hits.items;
+    if (payload.results && Array.isArray(payload.results)) return payload.results;
+
+    return [];
+  };
+
+  const commonHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'application/json',
+    'Origin': 'https://www.myscheme.gov.in',
+    'Referer': 'https://www.myscheme.gov.in/search'
+  };
+
   try {
     console.log('Fetching schemes from myScheme.gov.in...');
 
-    // myScheme.gov.in has a public API for searching schemes
-    const response = await axios.get('https://www.myscheme.gov.in/api/v1/schemes', {
-      params: {
-        lang: 'en',
-        category: category,
-        sort: 'relevance',
+    // Endpoint signatures may change on myScheme. Try a small set of known patterns.
+    const attempts = [
+      () => axios.get('https://www.myscheme.gov.in/api/v1/schemes', {
+        params: {
+          lang: 'en',
+          category,
+          sort: 'relevance',
+          page: 1,
+          limit: 100
+        },
+        headers: commonHeaders,
+        timeout: 15000
+      }),
+      () => axios.get('https://www.myscheme.gov.in/api/search', {
+        params: {
+          q: 'agriculture farmer',
+          category,
+          lang: 'en',
+          page: 1,
+          limit: 100
+        },
+        headers: commonHeaders,
+        timeout: 15000
+      }),
+      () => axios.post('https://www.myscheme.gov.in/api/search', {
+        query: '',
+        category: [category],
         page: 1,
-        limit: 100
-      },
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Origin': 'https://www.myscheme.gov.in',
-        'Referer': 'https://www.myscheme.gov.in/search'
-      },
-      timeout: 15000
-    });
+        limit: 100,
+        lang: 'en'
+      }, {
+        headers: {
+          ...commonHeaders,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
+      })
+    ];
 
-    if (response.data && response.data.data) {
-      console.log(`Found ${response.data.data.length} schemes from myScheme`);
-      return response.data.data;
+    for (const tryFetch of attempts) {
+      try {
+        const response = await tryFetch();
+        const schemes = normalizeResult(response.data);
+        if (schemes.length > 0) {
+          console.log(`Found ${schemes.length} schemes from myScheme`);
+          return schemes;
+        }
+      } catch (attemptError) {
+        console.log(`myScheme attempt failed: ${attemptError.message}`);
+      }
     }
 
+    console.log('No schemes returned from myScheme attempts');
     return [];
   } catch (error) {
     console.error('Error fetching from myScheme:', error.message);
-
-    // Fallback: Try alternative endpoint
-    try {
-      const fallbackResponse = await axios.get('https://www.myscheme.gov.in/api/search', {
-        params: {
-          q: 'agriculture farmer',
-          category: 'Agriculture,Rural & Environment'
-        },
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'application/json'
-        },
-        timeout: 15000
-      });
-
-      if (fallbackResponse.data?.schemes) {
-        return fallbackResponse.data.schemes;
-      }
-    } catch (fallbackError) {
-      console.error('Fallback also failed:', fallbackError.message);
-    }
-
     return [];
   }
 }

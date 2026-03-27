@@ -450,16 +450,93 @@ exports.getLiveSchemes = async (req, res) => {
   try {
     const govSchemeService = require('../services/govSchemeService');
     const { category = 'Agriculture,Rural & Environment' } = req.query;
-
-    const schemes = await govSchemeService.fetchFromMyScheme(category);
+    let schemes = await govSchemeService.fetchFromMyScheme(category);
+    let source = 'myscheme.gov.in';
 
     // Also get official portals
     const portals = govSchemeService.getOfficialSchemePortals();
 
+    // Fallback when upstream myScheme API is unavailable/changed
+    if (!Array.isArray(schemes) || schemes.length === 0) {
+      source = 'fallback:database+official_portals';
+      const categoryToLocal = {
+        'Agriculture,Rural & Environment': ['subsidy', 'equipment', 'infrastructure', 'training', 'insurance', 'loan'],
+        'Financial Assistance': ['subsidy', 'loan'],
+        'Social welfare & Empowerment': ['other'],
+        'Education & Learning': ['training'],
+        'Skills & Employment': ['training'],
+        'Health & Wellness': ['insurance'],
+        'Housing & Shelter': ['infrastructure'],
+        'Science, IT & Communications': ['equipment'],
+        'Sports & Culture': ['other'],
+        'Transport & Infrastructure': ['infrastructure'],
+        'Utility & Sanitation': ['infrastructure']
+      };
+
+      const localCategories = categoryToLocal[category] || ['subsidy', 'loan', 'insurance', 'training', 'equipment', 'infrastructure', 'marketing', 'other'];
+
+      const dbSchemes = await Scheme.find({
+        status: { $in: ['active', 'upcoming'] },
+        category: { $in: localCategories }
+      })
+        .select('name shortDescription fullDescription category benefits implementingAgency applicationProcess eligibility documents tags timeline source externalId')
+        .sort({ featured: -1, priority: -1, updatedAt: -1 })
+        .limit(120)
+        .lean();
+
+      const portalSchemes = portals.map((portal, idx) => ({
+        id: `official-${idx + 1}`,
+        schemeId: `official-${idx + 1}`,
+        schemeName: portal.name,
+        name: portal.name,
+        shortDescription: 'Official Government of India scheme portal',
+        description: `Apply directly at official portal. Helpline: ${portal.helpline || 'N/A'}`,
+        category: 'Agriculture,Rural & Environment',
+        schemeType: 'Central',
+        ministry: 'Government of India',
+        officialUrl: portal.website,
+        website: portal.website,
+        applicationUrl: portal.applyUrl,
+        applyLink: portal.applyUrl,
+        helpline: portal.helpline,
+        source: 'official_portals'
+      }));
+
+      const transformedDbSchemes = dbSchemes.map((s) => ({
+        id: s.externalId || String(s._id),
+        schemeId: s.externalId || String(s._id),
+        schemeName: s.name,
+        name: s.name,
+        shortDescription: s.shortDescription,
+        description: s.fullDescription || s.shortDescription,
+        category: category,
+        schemeType: s.implementingAgency?.type === 'state' ? 'State' : 'Central',
+        ministry: s.implementingAgency?.name || 'Government of India',
+        officialUrl: s.implementingAgency?.website,
+        website: s.implementingAgency?.website,
+        applicationUrl: s.applicationProcess?.onlinePortal,
+        applyLink: s.applicationProcess?.onlinePortal,
+        eligibility: s.eligibility?.additionalCriteria || [],
+        states: s.eligibility?.states || [],
+        benefits: s.benefits?.description || '',
+        source: s.source || 'database'
+      }));
+
+      const deduped = new Map();
+      [...transformedDbSchemes, ...portalSchemes].forEach((item) => {
+        const key = (item.schemeName || item.name || '').toLowerCase();
+        if (key && !deduped.has(key)) {
+          deduped.set(key, item);
+        }
+      });
+
+      schemes = Array.from(deduped.values());
+    }
+
     res.json({
       success: true,
       count: schemes.length,
-      source: 'myscheme.gov.in',
+      source,
       data: schemes,
       officialPortals: portals
     });
