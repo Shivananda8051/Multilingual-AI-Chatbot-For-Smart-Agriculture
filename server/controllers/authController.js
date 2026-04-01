@@ -98,18 +98,40 @@ exports.sendOTP = async (req, res) => {
     const otp = user.generateOTP();
     await user.save();
 
-    // In development, log OTP to console
-    // For production, use Firebase Phone Auth on client side
     if (process.env.NODE_ENV === 'development') {
+      // Development: log and return OTP in response
       console.log(`Development OTP for ${phone}: ${otp}`);
+      return res.status(200).json({
+        success: true,
+        message: 'Development Mode - OTP shown below',
+        otp
+      });
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Please use Firebase Phone Authentication on the client side',
-      // Only include OTP in development for testing
-      ...(process.env.NODE_ENV === 'development' && { otp })
-    });
+    // Production: send OTP via Twilio SMS
+    try {
+      await twilioService.sendOTP(phone, otp);
+      res.status(200).json({
+        success: true,
+        message: 'OTP sent to your phone via SMS'
+      });
+    } catch (twilioError) {
+      console.error('Twilio SMS error:', twilioError.message);
+      // Fallback: try WhatsApp
+      try {
+        await twilioService.sendWhatsAppOTP(phone, otp);
+        res.status(200).json({
+          success: true,
+          message: 'OTP sent to your WhatsApp'
+        });
+      } catch (whatsappError) {
+        console.error('Twilio WhatsApp error:', whatsappError.message);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to send OTP. Please try again later.'
+        });
+      }
+    }
   } catch (error) {
     console.error('Send OTP error:', error);
     res.status(500).json({
