@@ -1,5 +1,6 @@
 const weatherService = require('../services/weatherService');
 const ollamaService = require('../services/ollamaService');
+const groqService = require('../services/groqService');
 const translationService = require('../services/translationService');
 
 // @desc    Get weather by city name
@@ -131,9 +132,39 @@ exports.getWeatherAdvice = async (req, res) => {
     // Get basic weather advice
     const basicAdvice = weatherService.getFarmingAdvice(weatherData.weather);
 
-    // Get AI-powered detailed advice (directly in user's language)
+    // Get AI-powered detailed advice (Groq primary, Ollama fallback)
     const crops = req.user.cropsGrown || ['general crops'];
-    const aiAdvice = await ollamaService.getWeatherAdvice(weatherData.weather, crops, userLanguage);
+    let aiAdvice;
+    if (groqService.isConfigured()) {
+      try {
+        const cropList = crops.length > 0 ? crops.join(', ') : 'rice, wheat, vegetables, cotton';
+        const langName = ollamaService.getLanguageName(userLanguage);
+        const weatherPrompt = `Based on today's weather, provide practical FARMING tips for Indian farmers.
+
+**Today's Weather:**
+- Temperature: ${weatherData.weather.temp}°C
+- Humidity: ${weatherData.weather.humidity}%
+- Weather: ${weatherData.weather.condition}
+- Wind: ${weatherData.weather.windSpeed || 0} m/s
+
+**Common crops:** ${cropList}
+
+Give 4-5 actionable farming tips for the next 24-48 hours. Focus on irrigation, pest risk, field work, crop protection.
+Format: **Tip Title:** Explanation in 1-2 sentences.
+
+IMPORTANT: Respond ENTIRELY in ${langName} language.`;
+
+        aiAdvice = await groqService.chat([
+          { role: 'system', content: `You are an expert agricultural advisor for Indian farmers. Respond in ${langName} language only.` },
+          { role: 'user', content: weatherPrompt }
+        ], { temperature: 0.7, maxTokens: 500 });
+      } catch (groqError) {
+        console.log('Groq weather advice failed, falling back to Ollama:', groqError.message);
+        aiAdvice = await ollamaService.getWeatherAdvice(weatherData.weather, crops, userLanguage);
+      }
+    } else {
+      aiAdvice = await ollamaService.getWeatherAdvice(weatherData.weather, crops, userLanguage);
+    }
 
     res.status(200).json({
       success: true,

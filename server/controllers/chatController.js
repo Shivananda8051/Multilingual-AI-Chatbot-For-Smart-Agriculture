@@ -1,5 +1,6 @@
 const Chat = require('../models/Chat');
 const ollamaService = require('../services/ollamaService');
+const groqService = require('../services/groqService');
 
 // @desc    Send message to AI chatbot
 // @route   POST /api/chat/message
@@ -37,13 +38,36 @@ exports.sendMessage = async (req, res) => {
       content: msg.content
     }));
 
-    // Get response from Ollama (directly in user's language)
+    // Get response from LLM (Groq primary, Ollama fallback)
     const userContext = {
       location: req.user.location?.city || 'India',
       crops: req.user.cropsGrown
     };
 
-    const aiResponse = await ollamaService.chat(llmMessages, userContext, userLanguage);
+    let aiResponse;
+    if (groqService.isConfigured()) {
+      try {
+        const systemPrompt = ollamaService.getSystemPrompt(userLanguage);
+        const contextInfo = `User context: Location: ${userContext.location || 'India'}, Main crops: ${userContext.crops?.join(', ') || 'various crops'}`;
+
+        // Check for greeting
+        const lastMsg = llmMessages[llmMessages.length - 1];
+        if (lastMsg && lastMsg.role === 'user' && ollamaService.isGreeting(lastMsg.content)) {
+          aiResponse = { message: ollamaService.getGreetingResponse(userLanguage) };
+        } else {
+          const groqMessages = [
+            { role: 'system', content: `${systemPrompt}\n\n${contextInfo}` },
+            ...llmMessages
+          ];
+          aiResponse = await groqService.chat(groqMessages, { temperature: 0.7, maxTokens: 300 });
+        }
+      } catch (groqError) {
+        console.log('Groq failed, falling back to Ollama:', groqError.message);
+        aiResponse = await ollamaService.chat(llmMessages, userContext, userLanguage);
+      }
+    } else {
+      aiResponse = await ollamaService.chat(llmMessages, userContext, userLanguage);
+    }
 
     // Response is already in user's language
     const responseContent = aiResponse.message;
@@ -64,10 +88,30 @@ exports.sendMessage = async (req, res) => {
     // Generate related suggestions (in user's language)
     let suggestions = [];
     try {
-      suggestions = await ollamaService.generateSuggestions(message, responseContent, userLanguage);
+      if (groqService.isConfigured()) {
+        try {
+          const langName = ollamaService.getLanguageName(userLanguage);
+          const langInstruction = userLanguage !== 'en' ? ` Generate the questions in ${langName} language.` : '';
+          const suggestPrompt = `Farmer asked: "${message}"\n\nGenerate exactly 3 SHORT follow-up questions about FARMING/AGRICULTURE only.${langInstruction}\n\nRULES:\n- Questions MUST be about crops, farming, agriculture\n- Keep each question under 8 words\n- Return ONLY a JSON array\nExample: ["Best fertilizer for rice?", "When to water crops?", "How to control pests?"]`;
+
+          const suggestResult = await groqService.chat([
+            { role: 'system', content: `You generate ONLY farming related follow-up questions. Return ONLY a JSON array of 3 questions.${langInstruction}` },
+            { role: 'user', content: suggestPrompt }
+          ], { temperature: 0.5, maxTokens: 200 });
+
+          const jsonMatch = suggestResult.message.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            suggestions = JSON.parse(jsonMatch[0]).slice(0, 3);
+          }
+        } catch (groqSuggestError) {
+          suggestions = await ollamaService.generateSuggestions(message, responseContent, userLanguage);
+        }
+      } else {
+        suggestions = await ollamaService.generateSuggestions(message, responseContent, userLanguage);
+      }
     } catch (suggestionError) {
       console.error('Suggestion error:', suggestionError);
-      // Continue without suggestions
+      suggestions = ollamaService.getFallbackSuggestions(message, userLanguage);
     }
 
     res.status(200).json({
