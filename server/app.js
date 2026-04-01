@@ -36,7 +36,8 @@ app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false  // Disable CSP to allow Unsplash images and inline styles
 }));
 
 // Rate limiting - DISABLED for development
