@@ -469,7 +469,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="space-y-4 lg:space-y-6 overflow-x-hidden">
       {/* Main Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
         <StatCard
@@ -761,12 +761,12 @@ const AdminDashboard = () => {
             <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
               <div
                 onClick={(e) => { e.stopPropagation(); handleToggleOTP(); }}
-                className={`relative w-12 h-7 lg:w-14 lg:h-8 rounded-full transition-colors cursor-pointer ${
+                className={`relative inline-flex items-center w-11 h-6 lg:w-14 lg:h-8 rounded-full transition-colors cursor-pointer flex-shrink-0 ${
                   otpEnabled ? 'bg-green-500' : 'bg-gray-300'
                 }`}
               >
-                <span className={`absolute top-1 w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-white shadow transition-transform ${
-                  otpEnabled ? 'translate-x-6 lg:translate-x-7' : 'translate-x-1'
+                <span className={`inline-block w-4 h-4 lg:w-6 lg:h-6 rounded-full bg-white shadow transition-transform ${
+                  otpEnabled ? 'translate-x-[22px] lg:translate-x-7' : 'translate-x-1'
                 }`} />
               </div>
               {showOtpPanel ? <HiChevronUp className="w-4 h-4 lg:w-5 lg:h-5 text-gray-400" /> : <HiChevronDown className="w-4 h-4 lg:w-5 lg:h-5 text-gray-400" />}

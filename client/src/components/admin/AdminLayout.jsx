@@ -163,7 +163,7 @@ const AdminLayout = () => {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-64">
+      <div className="flex-1 lg:ml-64 min-w-0 overflow-x-hidden">
         {/* Top Header */}
         <header className="bg-transparent px-4 lg:px-8 py-4 lg:py-6 sticky top-0 z-20">
           <div className="flex items-center justify-between">

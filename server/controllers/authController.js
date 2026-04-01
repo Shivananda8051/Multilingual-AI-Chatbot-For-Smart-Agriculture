@@ -164,10 +164,10 @@ exports.sendWhatsAppOTP = async (req, res) => {
     const otp = user.generateOTP();
     await user.save();
 
-    // Check if OTP service is enabled
+    // Check if OTP service is enabled or if in production
     const otpServiceEnabled = await Settings.getSetting('otpServiceEnabled', false);
 
-    if (otpServiceEnabled) {
+    if (otpServiceEnabled || process.env.NODE_ENV === 'production') {
       // Send real OTP via WhatsApp
       try {
         await twilioService.sendWhatsAppOTP(phone, otp);
@@ -227,10 +227,10 @@ exports.sendSmsOTP = async (req, res) => {
     const otp = user.generateOTP();
     await user.save();
 
-    // Check if OTP service is enabled
+    // Check if OTP service is enabled or if in production
     const otpServiceEnabled = await Settings.getSetting('otpServiceEnabled', false);
 
-    if (otpServiceEnabled) {
+    if (otpServiceEnabled || process.env.NODE_ENV === 'production') {
       // Send real OTP via SMS
       try {
         await twilioService.sendOTP(phone, otp);
@@ -532,7 +532,18 @@ exports.adminLogin = async (req, res) => {
   try {
     const { phone, otp } = req.body;
 
-    const user = await User.findOne({ phone, role: 'admin' });
+    // Normalize phone: try with and without +91 prefix
+    let user = await User.findOne({ phone, role: 'admin' });
+    if (!user) {
+      // Try alternate formats
+      const altPhone = phone.startsWith('+91') ? phone.slice(3) : `+91${phone.replace(/^\+/, '')}`;
+      user = await User.findOne({ phone: altPhone, role: 'admin' });
+    }
+    if (!user) {
+      // Also search with regex for flexible matching
+      const digits = phone.replace(/\D/g, '').slice(-10);
+      user = await User.findOne({ phone: { $regex: digits + '$' }, role: 'admin' });
+    }
 
     if (!user) {
       return res.status(404).json({
@@ -542,10 +553,18 @@ exports.adminLogin = async (req, res) => {
     }
 
     if (!user.verifyOTP(otp)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired OTP'
-      });
+      // Check if OTP was saved on a duplicate non-admin user
+      const altUser = await User.findOne({ phone: req.body.phone, role: { $ne: 'admin' } });
+      if (altUser && altUser.verifyOTP(otp)) {
+        // Transfer OTP verification to admin user
+        altUser.otp = undefined;
+        await altUser.save();
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired OTP'
+        });
+      }
     }
 
     user.otp = undefined;
