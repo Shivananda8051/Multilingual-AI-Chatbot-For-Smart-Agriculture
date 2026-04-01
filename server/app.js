@@ -66,7 +66,8 @@ const corsOptions = {
       /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,    // 10.x.x.x network
       /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/,   // 172.x.x.x network (hotspot)
       /^https?:\/\/.*\.vercel\.app$/,         // Vercel deployments
-      /^https?:\/\/.*\.netlify\.app$/         // Netlify deployments
+      /^https?:\/\/.*\.netlify\.app$/,        // Netlify deployments
+      /^https?:\/\/.*\.onrender\.com$/        // Render deployments
     ];
 
     const isAllowed = allowedPatterns.some(pattern => pattern.test(origin));
@@ -117,6 +118,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Smart Agriculture API is running' });
 });
 
+// Serve React client in production
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+  app.use(express.static(clientBuildPath));
+}
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -127,7 +134,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
+// In production, serve React app for non-API routes (SPA fallback)
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
+
+// 404 handler (only hits for unmatched API routes in production, or all unmatched in dev)
 app.use((req, res) => {
   res.status(404).json({
     success: false,

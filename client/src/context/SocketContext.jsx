@@ -51,11 +51,14 @@ export const SocketProvider = ({ children }) => {
     if (!apiUrl || apiUrl === '/api' || apiUrl.startsWith('/')) {
       // Use the current page's hostname so mobile devices can connect
       const hostname = window.location.hostname;
-      // For localhost, always use HTTP for Socket.IO (server is HTTP)
-      // For production/remote, match the page protocol
       const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-      const protocol = isLocalhost ? 'http:' : window.location.protocol;
-      socketUrl = `${protocol}//${hostname}:5000`;
+      if (isLocalhost) {
+        // Local dev: connect to backend on port 5000
+        socketUrl = `http://${hostname}:5000`;
+      } else {
+        // Production (Render, etc.): same origin, no port needed
+        socketUrl = `${window.location.protocol}//${hostname}`;
+      }
     } else {
       // Full URL provided - extract base URL (remove /api)
       socketUrl = apiUrl.replace('/api', '');

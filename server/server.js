@@ -1,4 +1,6 @@
+// Load .env from parent directory (local dev) or current environment (production)
 require('dotenv').config({ path: '../.env' });
+require('dotenv').config(); // fallback: load from process env (Render sets env vars directly)
 const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/db');
